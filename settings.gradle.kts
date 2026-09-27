@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Horário Escolar"
+rootProject.name = "ClassNest"
 
 include(":app")
