@@ -1,0 +1,8 @@
+{
+  "name": "Horário Escolar",
+  "description": "App de horário escolar com landing page Google Auth, sincronização de encarregados e educandos, chat bidirecional in-app, scan OCR de horário, exames e alertas escolares.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

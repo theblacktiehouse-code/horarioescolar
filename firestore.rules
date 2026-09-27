@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isUser(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isMemberOfFamily(familyId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid));
+    }
+
+    function isParentOfFamily(familyId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.role == "PARENT";
+    }
+
+    // User profiles collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isUser(userId);
+    }
+
+    // User Family Memberships index collection
+    match /user_family_memberships/{membershipId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isParentOfFamily(resource.data.familyId)
+      );
+      allow create, update: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        isParentOfFamily(request.resource.data.familyId)
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isParentOfFamily(resource.data.familyId)
+      );
+    }
+
+    // Families collection
+    match /families/{familyId} {
+      allow read: if isMemberOfFamily(familyId);
+      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if isParentOfFamily(familyId);
+
+      // Members subcollection
+      match /members/{memberId} {
+        allow read: if isMemberOfFamily(familyId);
+        allow create, update: if isAuthenticated() && (
+          isParentOfFamily(familyId) ||
+          request.auth.uid == memberId
+        );
+        allow delete: if isParentOfFamily(familyId);
+      }
+
+      // Student profiles subcollection
+      match /students/{studentId} {
+        allow read: if isMemberOfFamily(familyId);
+        allow create, delete: if isParentOfFamily(familyId);
+        allow update: if isAuthenticated() && (
+          isParentOfFamily(familyId) ||
+          (resource.data.email == request.auth.token.email && request.resource.data.userId == request.auth.uid)
+        );
+      }
+
+      // Schedules subcollection
+      match /schedules/{scheduleId} {
+        allow read: if isMemberOfFamily(familyId);
+        allow write: if isParentOfFamily(familyId);
+      }
+
+      // Exams subcollection
+      match /exams/{examId} {
+        allow read: if isMemberOfFamily(familyId);
+        allow write: if isParentOfFamily(familyId);
+      }
+
+      // Notes subcollection (both parents and students can write notes)
+      match /notes/{noteId} {
+        allow read: if isMemberOfFamily(familyId);
+        allow write: if isMemberOfFamily(familyId);
+      }
+
+      // Chat messages subcollection
+      match /messages/{messageId} {
+        allow read: if isMemberOfFamily(familyId);
+        allow create: if isMemberOfFamily(familyId);
+        allow update, delete: if isMemberOfFamily(familyId) && resource.data.senderUserId == request.auth.uid;
+      }
+
+      // Contacts subcollection
+      match /contacts/{contactId} {
+        allow read: if isMemberOfFamily(familyId);
+        allow write: if isParentOfFamily(familyId);
+      }
+
+      // Alerts subcollection
+      match /alerts/{alertId} {
+        allow read: if isMemberOfFamily(familyId);
+        allow write: if isParentOfFamily(familyId);
+      }
+    }
+
+    // Student Invitations collection
+    match /student_invitations/{invitationId} {
+      allow read: if isAuthenticated() && (
+        resource.data.studentEmail == request.auth.token.email ||
+        isParentOfFamily(resource.data.familyId)
+      );
+      allow create: if isAuthenticated() && isParentOfFamily(request.resource.data.familyId);
+      allow update: if isAuthenticated() && (
+        resource.data.studentEmail == request.auth.token.email ||
+        isParentOfFamily(resource.data.familyId)
+      );
+      allow delete: if isAuthenticated() && isParentOfFamily(resource.data.familyId);
+    }
+
+    // Parent Invitations collection
+    match /parent_invitations/{invitationId} {
+      allow read: if isAuthenticated() && (
+        resource.data.parentEmail == request.auth.token.email ||
+        isParentOfFamily(resource.data.familyId)
+      );
+      allow create: if isAuthenticated() && isParentOfFamily(request.resource.data.familyId);
+      allow update: if isAuthenticated() && (
+        resource.data.parentEmail == request.auth.token.email ||
+        isParentOfFamily(resource.data.familyId)
+      );
+      allow delete: if isAuthenticated() && isParentOfFamily(resource.data.familyId);
+    }
+  }
+}
